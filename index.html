@@ -148,27 +148,19 @@
       const list = document.getElementById('repo-list');
       list.innerHTML = data.items.map((repo, i) => {
         const updatedDate = new Date(repo.pushed_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-        return `
-          <div class="repo-item">
-            <div class="rank">#${i + 1}</div>
-            <div class="repo-info">
-              <h3>${repo.full_name}</h3>
-              <p>${repo.description || 'Proyecto comunitario de código abierto relacionado con GTA 6.'}</p>
-            </div>
-            <div class="repo-stats">
-              <div class="stars">⭐ ${repo.stargazers_count}</div>
-              <div class="updated">Act: ${updatedDate} (${repo.language || 'Código'})</div>
-            </div>
-          </div>
-        `;
+        return '<div class="repo-item">' +
+          '<div class="rank">#' + (i + 1) + '</div>' +
+          '<div class="repo-info"><h3>' + repo.full_name + '</h3><p>' + (repo.description || 'Proyecto comunitario de código abierto de GTA 6.') + '</p></div>' +
+          '<div class="repo-stats"><div class="stars">⭐ ' + repo.stargazers_count + '</div><div class="updated">Act: ' + updatedDate + '</div></div>' +
+        '</div>';
       }).join('');
 
       const log = document.getElementById('activity-log');
       log.innerHTML = data.items.slice(0, 4).map(r =>
-        `<div class="log-entry">🔄 <b>${r.name}</b> actualizado a las ${new Date(r.pushed_at).toLocaleTimeString('es-ES')}</div>`
+        '<div class="log-entry">🔄 <b>' + r.name + '</b> actualizado a las ' + new Date(r.pushed_at).toLocaleTimeString('es-ES') + '</div>'
       ).join('');
     } catch (e) {
-      console.error("Error leyendo GitHub:", e);
+      console.error(e);
     }
   }
 
@@ -178,44 +170,71 @@
     const msgEl = document.getElementById('chat-response');
 
     if (cmd.startsWith('!info')) {
-      userEl.textContent = `💬 ${user} preguntó !info`;
-      msgEl.textContent = 'Este directo rastrea en tiempo real herramientas, mapas, parsers y mods de código abierto creados por la comunidad para GTA 6 en GitHub.';
+      userEl.textContent = '💬 ' + user + ' preguntó !info';
+      msgEl.textContent = 'Este directo rastrea en tiempo real herramientas, mapas y proyectos de código abierto de GTA 6 en GitHub.';
     } else if (cmd.startsWith('!ranking') && reposCache.length > 0) {
-      userEl.textContent = `💬 ${user} preguntó !ranking`;
-      msgEl.textContent = `Ahora mismo lidera el ranking "${reposCache[0].full_name}" con ${reposCache[0].stargazers_count} estrellas en GitHub.`;
+      userEl.textContent = '💬 ' + user + ' preguntó !ranking';
+      msgEl.textContent = 'Ahora mismo lidera el ranking "' + reposCache.full_name + '" con ' + reposCache.stargazers_count + ' estrellas.';
     } else if (cmd.startsWith('!github')) {
-      userEl.textContent = `💬 ${user} preguntó !github`;
-      msgEl.textContent = 'Los datos se consultan automáticamente cada 60 segundos usando la API oficial de GitHub.';
+      userEl.textContent = '💬 ' + user + ' preguntó !github';
+      msgEl.textContent = 'Los datos se actualizan cada 60 segundos usando la API oficial de GitHub.';
     } else if (cmd.startsWith('!meta')) {
-      userEl.textContent = `💬 ${user} preguntó !meta`;
-      msgEl.textContent = '¡Suscríbete para ayudarnos a llegar a los 1,000 suscriptores y mantener este servidor 24/7 activo!';
+      userEl.textContent = '💬 ' + user + ' preguntó !meta';
+      msgEl.textContent = '¡Suscríbete para ayudarnos a llegar a los 1,000 suscriptores y mantener este directo 24/7!';
     }
   }
 
   async function initYouTubeChat() {
     if (!API_KEY_YOUTUBE || !VIDEO_ID_DIRECTO) return;
     try {
-      const url = `https://googleapis.com{VIDEO_ID_DIRECTO}&key=${API_KEY_YOUTUBE}`;
+      const url = 'https://googleapis.com' + VIDEO_ID_DIRECTO + '&key=' + API_KEY_YOUTUBE;
       const res = await fetch(url);
       const data = await res.json();
-      if (data.items && data.items[0]?.liveStreamingDetails?.activeLiveChatId) {
-        liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
+      if (data.items && data.items.liveStreamingDetails && data.items.liveStreamingDetails.activeLiveChatId) {
+        liveChatId = data.items.liveStreamingDetails.activeLiveChatId;
         setInterval(pollYouTubeChat, 6000);
       }
-    } catch (e) {
-      console.error("Error conectando chat de YouTube:", e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   async function pollYouTubeChat() {
     if (!liveChatId) return;
     try {
-      let url = `https://googleapis.com{liveChatId}&part=snippet,authorDetails&key=${API_KEY_YOUTUBE}`;
-      if (nextPageToken) url += `&pageToken=${nextPageToken}`;
+      let url = 'https://googleapis.com' + liveChatId + '&part=snippet,authorDetails&key=' + API_KEY_YOUTUBE;
+      if (nextPageToken) url += '&pageToken=' + nextPageToken;
       const res = await fetch(url);
       const data = await res.json();
       if (data.nextPageToken) nextPageToken = data.nextPageToken;
       if (data.items) {
         data.items.forEach(item => {
-          const author = item.authorDetails.displayName;
-          const message = item.snippet.displayMessage;
+          handleCommand(item.authorDetails.displayName, item.snippet.displayMessage);
+        });
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  const demoCommands = [['CarlosGamer', '!info'], ['ElenaDev', '!ranking'], ['Marcos_99', '!github']];
+  let demoIndex = 0;
+
+  setInterval(() => {
+    secondsLeft--;
+    if (secondsLeft <= 0) {
+      secondsLeft = 60;
+      fetchGitHubProjects();
+    }
+    document.getElementById('countdown').textContent = secondsLeft + 's';
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString('es-ES');
+
+    if ((!API_KEY_YOUTUBE || !VIDEO_ID_DIRECTO) && secondsLeft % 20 === 0) {
+      const pair = demoCommands[demoIndex % demoCommands.length];
+      handleCommand(pair, pair);
+      demoIndex++;
+    }
+  }, 1000);
+
+  fetchGitHubProjects();
+  initYouTubeChat();
+</script>
+</body>
+</html>
+
